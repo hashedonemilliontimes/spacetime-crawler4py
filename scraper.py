@@ -15,7 +15,33 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+    if resp.status != 200:
+        return []
+    
+    # check if we have content
+    if not resp.raw_response or not resp.raw_response.content:
+        return []
+    
+    try:
+        # parse the HTML content
+        soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+        links = []
+        
+        # find all anchor tags with href attributes
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            # convert relative URLs to absolute URLs
+            absolute_url = urljoin(url, href)
+            # remove fragment part (everything after #)
+            if '#' in absolute_url:
+                absolute_url = absolute_url.split('#')[0]
+            links.append(absolute_url)
+        
+        return links
+    except Exception as e:
+        print(f"Error parsing HTML for {url}: {e}")
+        return []
+	return list()
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -25,6 +51,19 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+
+		# check if URL is from allowed UCI domains
+        allowed_domains = [
+            "ics.uci.edu",
+            "cs.uci.edu", 
+            "informatics.uci.edu",
+            "stat.uci.edu"
+        ]
+        
+        domain = parsed.netloc.lower()
+        if not any(domain.endswith(allowed_domain) for allowed_domain in allowed_domains):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
