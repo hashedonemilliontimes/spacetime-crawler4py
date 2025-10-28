@@ -1,9 +1,19 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
+
+seen_urls = set()
 
 def scraper(url, resp):
+    global seen_urls
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+    valid_links = []
+    
+    for link in links:
+        if link not in seen_urls and is_valid(link):
+            seen_urls.add(link)
+            valid_links.append(link)
+
+    return valid_links
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -64,6 +74,14 @@ def is_valid(url):
         if not any(domain.endswith(allowed_domain) for allowed_domain in allowed_domains):
             return False
 
+        # Crawler Trap Protections
+        if len(url) > 200:
+            return False
+        if url.count('/') > 20:
+            return False
+        if len(parsed.query) > 100:
+            return False
+    
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
