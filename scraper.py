@@ -94,7 +94,6 @@ def extract_next_links(url, resp):
     except Exception as e:
         print(f"Error parsing HTML for {url}: {e}")
         return []
-	return list()
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
