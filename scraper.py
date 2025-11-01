@@ -46,6 +46,37 @@ STOPWORDS = {
 }
 
 
+## Helper Functions for Grabbing Analytics ##
+
+def extract_words_from_html(content: bytes):
+    try:
+        soup = BeautifulSoup(content, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
+        words = re.split(r"\W+", text)
+        return [w.lower() for w in words if w and w.isascii()]
+    except Exeeption as e:
+        print("Word-extract error: ", e)
+        return[]
+
+
+def update_analytics(url: str, words):
+    for w in words:
+        if w not in STOPWORDS:
+            word_freq[w]+=1
+    
+    count = len(words)
+    if count > longest_page["words"]:
+        longest_page["words"] = count
+        longest_page["url"] = url
+    
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+    if host.endswith(".uci.edu") or host == "uci.edu":
+        subdomain_pages[host].add(url)
+
+###################
+
+
 def scraper(url, resp):
     global seen_urls
     links = extract_next_links(url, resp)
