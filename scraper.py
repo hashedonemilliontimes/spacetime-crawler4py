@@ -1,15 +1,67 @@
 import re
+import json
+import os
+from threading import RLock
 from urllib.parse import urlparse, urljoin, urldefrag
 from collections import Counter, defaultdict
 from bs4 import BeautifulSoup
 
 seen_urls = set()
+seen_urls_lock = RLock()  # Lock for thread-safe access to seen_urls
 
 ### analytics for report ###
+
+ANALYTICS_FILE = "analytics.json"
 
 word_freq = Counter() # for 50 most common words
 longest_page = {"url": None, "words": 0}
 subdomain_pages = defaultdict(set)
+analytics_lock = RLock()  # Lock for thread-safe access to analytics variables
+
+# Thresholds for page filtering
+DEAD_PAGE_THRESHOLD = 10  # Pages with fewer than this many words are considered dead
+LOW_INFO_THRESHOLD = 30   # Pages with fewer than this many words are considered low information
+
+############################
+
+## Analytics Persistence Functions ##
+
+def load_analytics():
+    """Load analytics from JSON file if it exists."""
+    global word_freq, longest_page, subdomain_pages
+    if os.path.exists(ANALYTICS_FILE):
+        try:
+            with open(ANALYTICS_FILE, 'r') as f:
+                data = json.load(f)
+                word_freq = Counter(data.get('word_freq', {}))
+                longest_page = data.get('longest_page', {"url": None, "words": 0})
+                # Convert subdomain_pages from dict of lists to dict of sets
+                subdomain_pages = defaultdict(set)
+                for domain, urls in data.get('subdomain_pages', {}).items():
+                    subdomain_pages[domain] = set(urls)
+        except Exception as e:
+            print(f"Error loading analytics: {e}")
+
+def save_analytics():
+    """Save analytics to JSON file (thread-safe)."""
+    global word_freq, longest_page, subdomain_pages
+    try:
+        # Thread-safe read: lock while reading analytics data to get consistent snapshot
+        with analytics_lock:
+            # Convert data to JSON-serializable format
+            data = {
+                'word_freq': dict(word_freq),
+                'longest_page': longest_page.copy(),  # Copy dict to avoid reference issues
+                'subdomain_pages': {domain: list(urls) for domain, urls in subdomain_pages.items()}
+            }
+        # Write outside lock to minimize lock hold time
+        with open(ANALYTICS_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving analytics: {e}")
+
+# Load analytics on module import
+load_analytics()
 
 ############################
 
@@ -60,19 +112,27 @@ def extract_words_from_html(content: bytes):
 
 
 def update_analytics(url: str, words):
-    for w in words:
-        if w not in stopwords:
-            word_freq[w]+=1
+    """Thread-safe update of analytics data."""
+    global word_freq, longest_page, subdomain_pages
     
-    count = len(words)
-    if count > longest_page["words"]:
-        longest_page["words"] = count
-        longest_page["url"] = url
+    with analytics_lock:
+        for w in words:
+            if w not in stopwords:
+                word_freq[w]+=1
+        
+        count = len(words)
+        if count > longest_page["words"]:
+            longest_page["words"] = count
+            longest_page["url"] = url
+        
+        parsed = urlparse(url)
+        host = parsed.netloc.lower()
+        if host.endswith(".uci.edu") or host == "uci.edu":
+            subdomain_pages[host].add(url)
     
-    parsed = urlparse(url)
-    host = parsed.netloc.lower()
-    if host.endswith(".uci.edu") or host == "uci.edu":
-        subdomain_pages[host].add(url)
+    # Save analytics periodically (every 100 pages or on every update for safety)
+    # Since we can't test, save frequently to avoid data loss
+    save_analytics()
 
 ###################
 
@@ -83,8 +143,20 @@ def scraper(url, resp):
     if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:
         return []
     
-    # for analytics, get words
+    # Extract words from the page content
     words = extract_words_from_html(resp.raw_response.content)
+    word_count = len(words)
+    
+    # Dead page detection: Skip pages with very few words (200 status but no meaningful content)
+    if word_count < DEAD_PAGE_THRESHOLD:
+        return []  # Skip dead pages - they return 200 but have no data
+    
+    # Low information page filtering: Skip pages with minimal content (navigation-only pages)
+    # This helps avoid crawling sets of similar pages with no information
+    if word_count < LOW_INFO_THRESHOLD:
+        return []  # Skip low information pages (mostly navigation/menus with no real content)
+    
+    # Update analytics for pages that pass the filters
     update_analytics(url, words)
 
     links = extract_next_links(url, resp)
@@ -94,9 +166,11 @@ def scraper(url, resp):
 
         link, _ = urldefrag(link) # make sure fragment is gone before checking
 
-        if link not in seen_urls and is_valid(link):
-            seen_urls.add(link)
-            valid_links.append(link)
+        # Thread-safe check and add to seen_urls
+        with seen_urls_lock:
+            if link not in seen_urls and is_valid(link):
+                seen_urls.add(link)
+                valid_links.append(link)
 
     return valid_links
 

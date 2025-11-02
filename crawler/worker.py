@@ -18,11 +18,11 @@ class Worker(Thread):
         super().__init__(daemon=True)
         
     def run(self):
-		consecutive_failures = 0
-		max_consecutive_failures = 10  # If frontier returns None 10 times in a row, it's likely empty
+        consecutive_failures = 0
+        max_consecutive_failures = 10  # If frontier returns None 10 times in a row, it's likely empty
         while True:
             tbd_url = self.frontier.get_tbd_url()
-                   if not tbd_url:
+            if not tbd_url:
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     self.logger.info("Frontier is empty. Stopping Crawler.")
@@ -40,9 +40,6 @@ class Worker(Thread):
             for scraped_url in scraped_urls:
                 self.frontier.add_url(scraped_url)
             self.frontier.mark_url_complete(tbd_url)
-			
-            # Note: per-domain politeness is now handled in Frontier.get_tbd_url()
-      		# time.sleep(self.config.time_delay)
      
     
    

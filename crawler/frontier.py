@@ -74,6 +74,10 @@ class Frontier(object):
                 
                 if time_since_last >= politeness_delay:
                     # Found a URL from a domain that's ready
+                    # Immediately reserve the domain by updating last request time
+                    # This prevents other threads from selecting URLs from this domain
+                    # until the politeness delay has passed
+                    self.domain_last_request[domain] = current_time
                     self.to_be_downloaded.pop(i)
                     return url
             
@@ -87,19 +91,21 @@ class Frontier(object):
         url = normalize(url)
         urlhash = get_urlhash(url)
         with self.lock:
-			if urlhash not in self.save:
-            	self.save[urlhash] = (url, False)
-            	self.save.sync()
-            	self.to_be_downloaded.append(url)
+            if urlhash not in self.save:
+                self.save[urlhash] = (url, False)
+                self.save.sync()
+                self.to_be_downloaded.append(url)
     
     def mark_url_complete(self, url):
         urlhash = get_urlhash(url)
-		with self.lock:
+        domain = self._get_domain(url)
+        with self.lock:
+            if urlhash not in self.save:
+                # This should not happen.
+                self.logger.error(
+                    f"Completed url {url}, but have not seen it before.")
 
-        	if urlhash not in self.save:
-            	# This should not happen.
-            	self.logger.error(
-                	f"Completed url {url}, but have not seen it before.")
-
-        	self.save[urlhash] = (url, True)
-        	self.save.sync()
+            self.save[urlhash] = (url, True)
+            self.save.sync()
+            # Update domain request time for politeness
+            self.domain_last_request[domain] = time.time()
