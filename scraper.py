@@ -13,15 +13,15 @@ subdomain_pages = defaultdict(set)
 
 ############################
 
-
-ALLOWED_DOMAINS = [
+# check if URL is from allowed UCI domains
+allowed_domains = [
     "ics.uci.edu",
     "cs.uci.edu",
     "informatics.uci.edu",
     "stat.uci.edu"
 ]
 
-STOPWORDS = {
+stopwords = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an",
     "and", "any", "are", "aren't", "as", "at", "be", "because", "been",
     "before", "being", "below", "between", "both", "but", "by", "can't",
@@ -54,14 +54,14 @@ def extract_words_from_html(content: bytes):
         text = soup.get_text(separator=" ", strip=True)
         words = re.split(r"\W+", text)
         return [w.lower() for w in words if w and w.isascii()]
-    except Exeeption as e:
+    except Exception as e:
         print("Word-extract error: ", e)
-        return[]
+        return []
 
 
 def update_analytics(url: str, words):
     for w in words:
-        if w not in STOPWORDS:
+        if w not in stopwords:
             word_freq[w]+=1
     
     count = len(words)
@@ -79,10 +79,21 @@ def update_analytics(url: str, words):
 
 def scraper(url, resp):
     global seen_urls
+
+    if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:
+        return []
+    
+    # for analytics, get words
+    words = extract_words_from_html(resp.raw_response.content)
+    update_analytics(url, words)
+
     links = extract_next_links(url, resp)
     valid_links = []
     
     for link in links:
+
+        link, _ = urldefrag(link) # make sure fragment is gone before checking
+
         if link not in seen_urls and is_valid(link):
             seen_urls.add(link)
             valid_links.append(link)
@@ -131,20 +142,13 @@ def is_valid(url):
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
     try:
+        url, _ = urldefrag(url)
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-
-		# check if URL is from allowed UCI domains
-        allowed_domains = [
-            "ics.uci.edu",
-            "cs.uci.edu", 
-            "informatics.uci.edu",
-            "stat.uci.edu"
-        ]
-        
+    
         domain = parsed.netloc.lower()
-        if not any(domain.endswith(allowed_domain) for allowed_domain in allowed_domains):
+        if not any(domain == d or domain.endswith("." + d) for d in allowed_domains):
             return False
 
         # Crawler Trap Protections
