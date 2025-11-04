@@ -226,7 +226,7 @@ def is_valid(url):
             return False
 
         # Crawler Trap Protections
-        if len(url) > 200:
+        if len(url) > 2000:
             return False
         if url.count('/') > 20:
             return False
