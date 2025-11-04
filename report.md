@@ -7,13 +7,16 @@
 *2.* What is the longest page in terms of the number of words? (HTML markup doesn’t count as words)
 
     The longest page found was a subdomain page of the UCI ICS SEAL (Software
-    Engineering and Analysis Lab) page. The url is: "http://seal.ics.uci.edu
-    projects/covert/Covert-Mobile-1.0.apk" with 108739 words.
+    Engineering and Analysis Lab) page. The url is: "http://seal.ics.uci.eduprojects/covert/Covert-Mobile-1.0.apk" with 108739 words.
 
 *3.* What are the 50 most common words in the entire set of pages crawled under these domains ? (Ignore English stop words, which can be found, for example, here) Submit the list of common words ordered by frequency.
 
     The 50 most common words are:
-    png, res, drawable, data, qe, wiki, pk, page, circinus, ics, file, media, tools, support, files, hans, pngpk, ihdr, iend, will, uci, project, events, manager, search, xxhdpi, edu, june, user, can, https, xhdpi, date, mdpi, pm, services, changes, tomcat, code, name, projects, show, hdpi, jarmentr, security, software, use, tnptc, create, appcompt
+    png, res, drawable, data, qe, wiki, pk, page, circinus, ics, file, media,
+    tools, support, files, hans, pngpk, ihdr, iend, will, uci, project, events,
+    manager, search, xxhdpi, edu, june, user, can, https, xhdpi, date, mdpi, pm,
+    services, changes, tomcat, code, name, projects, show, hdpi, jarmentr,
+    security, software, use, tnptc, create, appcompt
 
 *4.* How many subdomains did you find in the uci.edu domain? Submit the list of subdomains ordered alphabetically and the number of unique pages detected in each subdomain. The content of this list should be lines containing subdomain, number, for example:
 vision.ics.uci.edu, 10 (not the actual number here)
